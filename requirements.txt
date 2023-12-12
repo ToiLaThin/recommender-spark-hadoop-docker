@@ -1,0 +1,6 @@
+py4j==0.10.9.7
+pyspark==3.5.0
+findspark==2.0.1
+numpy
+pandas
+ipykernel
