@@ -1,3 +1,18 @@
 venv/
 *.csv
 __pycache__/
+/assets/*
+/mnt/*
+.vscode/*
+
+# Airflow standalone generated files
+airflow/logs/*
+airflow.cfg
+airflow.db
+airflow-webserver.pid
+airflow.db-journal
+jdk.tar.gz
+standalone_admin_password.txt
+webserver_config.py
+
+.devcontainer/

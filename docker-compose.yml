@@ -1,0 +1,122 @@
+
+version: '3'
+
+
+services:
+  airflow-standalone:
+    build: ./airflow/
+    image: airflow-standalone:latest
+    hostname: airflow-standalone
+    container_name: airflow-standalone
+    ports:
+      - "8080:8080"
+    volumes:
+    # the dag in the container will be sync with the dag in the host (inside the airflow folder)
+      - ./airflow:/opt/airflow
+      - ./airflow/logs:/opt/airflow/logs
+    networks:
+      - dock_net
+    command: airflow standalone
+
+  hadoop-namenode:
+    build: ./hdfs/namenode/
+    image: namenode:latest #specify the name of image with tag when run docker compose up -d --build
+    hostname: namenode-master
+    ports:
+      - "50030:50030"
+      - "9870:9870"
+      - "8020:8020"
+    volumes:      
+      - ./mnt/namenode:/data
+      - ./mnt/spark-event-logs:/opt/hdfs/namenode/spark-event-logs
+      - ./mnt/spark-history-logs:/opt/hdfs/namenode/spark-history-logs
+    # this map the local file to the container file, so the data will be persistent, but only if the container can be deleted
+    container_name: namenode
+    networks:
+      - dock_net
+    # command: /opt/make-warehouse.sh
+
+  hadoop-datanode:
+    build: ./hdfs/datanode/
+    image: datanode:latest
+    volumes:
+      - ./mnt/datanode:/data
+    container_name: datanode
+    depends_on:
+      - hadoop-namenode
+    networks:
+      - dock_net
+  
+  yarn:
+    build: ./hdfs/yarn/
+    hostname: yarn
+    image: yarn:latest
+    ports:
+      - "9002:9002"
+      - "9003:9003"
+      - "9004:9004"
+      - "9005:9005"
+      - "9006:9006"
+    volumes:
+      - ./mnt/yarn:/data
+    container_name: yarn
+    depends_on:
+      - hadoop-namenode
+      - hadoop-datanode
+    networks:
+      - dock_net
+
+  hive-server-and-metastore:
+    build: ./hive/
+    image: hive:latest
+    hostname: hive-server-and-metastore
+    ports:
+      - "9880:9880"
+    container_name: hive
+    volumes:
+      - ./mnt/hive:/data
+    depends_on:
+      - hadoop-namenode 
+      - hadoop-datanode
+    networks:
+      - dock_net
+    command: /opt/init-metastore.sh
+
+  spark-master:
+    build: ./spark/master/
+    image: spark-master:latest
+    hostname: spark-master
+    ports:
+      - "7077:7077"
+      - "8082:8082"
+    container_name: spark-master
+    volumes:
+      - ./mnt/spark-master:/data
+    depends_on:
+      - hadoop-namenode
+      - hadoop-datanode
+      - yarn
+      - hive-server-and-metastore
+    networks:
+      - dock_net
+
+  spark-worker:
+    build: ./spark/worker/
+    image: spark-worker:latest
+    container_name: spark-worker
+    volumes:
+      - ./mnt/spark-worker:/data
+    depends_on:
+      - spark-master
+    networks:
+      - dock_net
+
+
+networks:
+  dock_net:
+    driver: bridge
+
+volumes:
+  aiflow_logs:
+  # Create a volume to avoid do not have permission to write logs on logs folder(default)
+  # These are volumn that are created, not mounted
